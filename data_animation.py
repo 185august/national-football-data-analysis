@@ -3,29 +3,57 @@ import numpy as np
 import pandas as pd
 import matplotlib.animation as animation
 
-def create_animation(df):
+
+
+
+def setup_plot_style(ax):
+    ax.set_facecolor('white')
+    ax.spines['right'].set_visible(False)
+    ax.tick_params(axis='both', which='major', labelsize=12)
+    ax.set_xlabel('Total goals scored', fontsize=14)
+    ax.set_title('Top 10 teams by total goals scored', fontsize=16)
+
+def add_year_text(ax, year):
+    ax.text(0.95, 0.1, year, horizontalalignment='right', verticalalignment='bottom', transform=ax.transAxes, fontsize=14)
+    return ax
+
+def create_animation():
     df = pd.read_csv('team_yearly_stats.csv')
 
+    all_teams = df['team'].unique()
+    cmap_name = 'tab20'
+    cmap_obj = plt.colormaps.get_cmap(cmap_name)
+    colors = cmap_obj.resampled(len(all_teams))
+
+    team_color_map = {team: colors(i) for i, team in enumerate(all_teams)}
+
+    df['total_goals_cumulative_sum'] = df.groupby('team')['total_goals_scored'].cumsum()
     frames = df['year'].unique()
-
-
-
     fig, ax = plt.subplots(figsize=(12, 6))
-
     def animate(frame):
         ax.clear()
         year_stats_frame = df[df['year'] == frame]
 
-        top_countries = year_stats_frame.nlargest(10, 'total_goals_scored').sort_values('total_goals_scored', ascending=True)
+        top_countries = year_stats_frame.nlargest(10, 'total_goals_cumulative_sum').sort_values('total_goals_cumulative_sum', ascending=True)
 
-        ax.barh(top_countries['team'], top_countries['total_goals_scored'])
+        bar_colors = [team_color_map[team] for team in top_countries['team']]
 
-    anim = animation.FuncAnimation(fig, animate, frames=frames, interval=200)
+        ax.barh(top_countries['team'], top_countries['total_goals_cumulative_sum'], color=bar_colors)
+
+        for i, row in top_countries.iterrows():
+            ax.text(row['total_goals_cumulative_sum'], row['team'], str(int(row["total_goals_cumulative_sum"])), ha='left', va='center')
+
+        setup_plot_style(ax)
+        add_year_text(ax, frame)
+        plt.tight_layout()
+
+    anim = animation.FuncAnimation(fig, animate, frames=frames, interval=300, repeat=False)
+
+
     return anim
 
 if __name__ == '__main__':
-    df = pd.read_csv('team_yearly_stats.csv')
-    anim = create_animation(df)
+    anim = create_animation()
     plt.show()
 
 def create_animation_of_goals_over_time(match_data):
