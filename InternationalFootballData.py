@@ -1,6 +1,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
-
+import matplotlib.animation as animation
+import numpy as np
 
 
 match_data = pd.read_csv('results.csv', parse_dates=['date'])
@@ -116,13 +117,128 @@ def create_team_statistic_summary(match_data):
         'avg_goals_conceded_per_game': total_goals_conceded / total_games,
         'goal_difference': home_goals - away_goals
     })
+    goals_summary.fillna(0, inplace=True)
     goals_summary.sort_values('total_goals', ascending=False)
     goals_summary.to_csv('teams_summary.csv')
     return goals_summary.sort_values('total_goals', ascending=False)
 
-#def create_statistics_about_what_type_of_goals_were_scored(goals_data):
+def create_yearly_team_statistics(df, csv_file_name):
+    match_data_copy = df.copy()
 
-team_stats = create_team_statistic_summary(match_data)
-team_stats.head(10)
+    match_data_copy = match_data_copy[match_data_copy['tournament'] == 'FIFA World Cup']
+    match_data_copy['home_win'] = match_data_copy['home_score'] > match_data_copy['away_score']
+    match_data_copy['away_win'] = match_data_copy['home_score'] < match_data_copy['away_score']
+    match_data_copy['draw'] = match_data_copy['home_score'] == match_data_copy['away_score']
+    match_data_copy['year'] = match_data_copy['date'].dt.year
+    non_neutral_matches = match_data_copy[match_data_copy['neutral'] == False]
+    yearly_home_wins = non_neutral_matches.groupby(['year', 'home_team'])['home_win'].sum()
+    yearly_away_wins = non_neutral_matches.groupby(['year', 'away_team'])['away_win'].sum()
+    yearly_home_draws = non_neutral_matches.groupby(['year', 'home_team'])['draw'].sum()
+    yearly_away_draws = non_neutral_matches.groupby(['year', 'away_team'])['draw'].sum()
+    yearly_home_losses = non_neutral_matches.groupby(['year', 'home_team'])['away_win'].sum()
+    yearly_away_losses = non_neutral_matches.groupby(['year', 'away_team'])['home_win'].sum()
+    yearly_goals_scored_home = non_neutral_matches.groupby(['year', 'home_team'])['home_score'].sum()
+    yearly_goals_scored_away = non_neutral_matches.groupby(['year', 'away_team'])['away_score'].sum()
+    yearly_goals_conceded_home = non_neutral_matches.groupby(['year', 'home_team'])['away_score'].sum()
+    yearly_goals_conceded_away = non_neutral_matches.groupby(['year', 'away_team'])['home_score'].sum()
 
-create_combined_data_frame(match_data, goalscorers)
+    home_stats = pd.DataFrame({
+        'home_wins': yearly_home_wins,
+        'home_draws': yearly_home_draws,
+        'home_losses': yearly_home_losses,
+        'home_goals_scored': yearly_goals_scored_home,
+        'home_goals_conceded': yearly_goals_conceded_home
+    })
+    home_stats.rename_axis(index={'home_team': 'team'}, inplace=True)
+    away_stats = pd.DataFrame({
+        'away_wins': yearly_away_wins,
+        'away_draws': yearly_away_draws,
+        'away_losses': yearly_away_losses,
+        'away_goals_scored': yearly_goals_scored_away,
+        'away_goals_conceded': yearly_goals_conceded_away
+    })
+    away_stats.rename_axis(index={'away_team': 'team'}, inplace=True)
+
+    neutral_matches = match_data_copy[match_data_copy['neutral'] == True]
+    yearly_neutral_home_wins = neutral_matches.groupby(['year', 'home_team'])['home_win'].sum()
+    yearly_neutral_home_draws = neutral_matches.groupby(['year', 'home_team'])['draw'].sum()
+    yearly_neutral_home_losses = neutral_matches.groupby(['year', 'home_team'])['away_win'].sum()
+    yearly_neutral_goals_scored_home = neutral_matches.groupby(['year', 'home_team'])['home_score'].sum()
+    yearly_neutral_goals_conceded_home = neutral_matches.groupby(['year', 'home_team'])['away_score'].sum()
+    neutral_home = pd.DataFrame({
+        'neutral_wins': yearly_neutral_home_wins,
+        'neutral_draws': yearly_neutral_home_draws,
+        'neutral_losses': yearly_neutral_home_losses,
+        'neutral_goals_scored': yearly_neutral_goals_scored_home,
+        'neutral_goals_conceded': yearly_neutral_goals_conceded_home
+    })
+    neutral_home.rename_axis(index={'home_team': 'team'}, inplace=True)
+
+    yearly_neutral_away_wins = neutral_matches.groupby(['year', 'away_team'])['away_win'].sum()
+    yearly_neutral_away_draws = neutral_matches.groupby(['year', 'away_team'])['draw'].sum()
+    yearly_neutral_away_losses = neutral_matches.groupby(['year', 'away_team'])['home_win'].sum()
+    yearly_neutral_goals_scored_away = neutral_matches.groupby(['year', 'away_team'])['away_score'].sum()
+    yearly_neutral_goals_conceded_away = neutral_matches.groupby(['year', 'away_team'])['home_score'].sum()
+    neutral_away = pd.DataFrame({
+        'neutral_wins': yearly_neutral_away_wins,
+        'neutral_draws': yearly_neutral_away_draws,
+        'neutral_losses': yearly_neutral_away_losses,
+        'neutral_goals_scored': yearly_neutral_goals_scored_away,
+        'neutral_goals_conceded': yearly_neutral_goals_conceded_away
+    })
+    neutral_away.rename_axis(index={'away_team': 'team'}, inplace=True)
+    #neutral_stats = pd.merge(neutral_home, neutral_away, on=['year', 'team'], how='outer')
+    neutral_stats = pd.concat([neutral_home, neutral_away])
+    neutral_stats = neutral_stats.groupby(['year', 'team']).sum()
+    neutral_stats.fillna(0, inplace=True)
+    neutral_stats.to_csv('temp_files/temp_neutral_stats.csv')
+    home_away_stats = home_stats.merge(away_stats, on=['year', 'team'], how='outer')
+    home_away_stats.fillna(0, inplace=True)
+    home_away_stats.to_csv('temp_files/temp_home_away_stats.csv')
+    team_stats = pd.merge(home_away_stats, neutral_stats, on=['year', 'team'], how='outer')
+    team_stats.fillna(0, inplace=True)
+    team_stats.to_csv('temp_files/temp_team_stats.csv')
+    team_stats['total_goals_scored'] = (
+            team_stats['home_goals_scored'] + team_stats['away_goals_scored'] + team_stats[
+        'neutral_goals_scored'])
+    team_stats['total_goals_conceded'] = (
+            team_stats['home_goals_conceded'] + team_stats['away_goals_conceded'] +
+            team_stats['neutral_goals_conceded'])
+    team_stats['total_goal_difference'] = (
+            team_stats['total_goals_scored'] - team_stats['total_goals_conceded'])
+    team_stats['total_points'] = (
+            team_stats['total_goals_scored'] * 3 + team_stats['total_goal_difference'] * 1)
+    team_stats['total_wins'] = (
+            team_stats['home_wins'] + team_stats['away_wins'] + team_stats[
+        'neutral_wins'])
+    team_stats['total_draws'] = (
+            team_stats['home_draws'] + team_stats['away_draws'] + team_stats[
+        'neutral_draws'])
+    team_stats['total_loses'] = (
+            team_stats['home_losses'] + team_stats['away_losses'] + team_stats[
+        'neutral_losses'])
+    team_stats['total_games_played'] = (
+            team_stats['total_wins'] + team_stats['total_draws'] + team_stats[
+        'total_loses'])
+    team_stats['win_percentage'] = (
+            team_stats['total_wins'] / team_stats['total_games_played'])
+    team_stats['draw_percentage'] = (
+            team_stats['total_draws'] / team_stats['total_games_played'])
+    team_stats['loss_percentage'] = (
+            team_stats['total_loses'] / team_stats['total_games_played'])
+
+    team_stats.to_csv(csv_file_name)
+
+
+def create_yearly_team_statistics_no_friendly(match_data):
+    match_data_copy = match_data.copy()
+    match_data_copy = match_data_copy[match_data_copy['tournament'] != 'Friendly']
+    create_yearly_team_statistics(match_data_copy, 'teams_yearly_summary_no_friendly.csv')
+
+def create_fifa_world_cup_stats(match_data):
+    match_data_copy = match_data.copy()
+    match_data_copy = match_data_copy[match_data_copy['tournament'] == 'FIFA World Cup']
+    create_yearly_team_statistics(match_data_copy, 'fifa_world_cups_teams_summary.csv')
+
+if __name__ == '__main__':
+    create_fifa_world_cup_stats(match_data)
