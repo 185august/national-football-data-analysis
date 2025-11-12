@@ -115,17 +115,22 @@ def create_team_statistic_summary(match_data):
         'games_played': total_games,
         'avg_goals_per_game': total_goals / total_games,
         'avg_goals_conceded_per_game': total_goals_conceded / total_games,
-        'goal_difference': home_goals - away_goals
+        'goal_difference': (home_goals + away_goals) - (home_goals_conceded + away_goals_conceded) ,
+        'home_win_percentage': home_wins / total_games,
+        'away_win_percentage': away_wins / total_games,
+        'home_draw_percentage': home_draws / total_games,
+        'away_draw_percentage': away_draws / total_games,
+        'home_loss_percentage': home_losses / total_games,
+        'away_loss_percentage': away_losses / total_games,
     })
     goals_summary.fillna(0, inplace=True)
     goals_summary.sort_values('total_goals', ascending=False)
-    goals_summary.to_csv('teams_summary.csv')
-    return goals_summary.sort_values('total_goals', ascending=False)
+    goals_summary.to_csv('overall_teams_statistics.csv')
 
 def create_yearly_team_statistics(df, csv_file_name):
     match_data_copy = df.copy()
 
-    match_data_copy = match_data_copy[match_data_copy['tournament'] == 'FIFA World Cup']
+
     match_data_copy['home_win'] = match_data_copy['home_score'] > match_data_copy['away_score']
     match_data_copy['away_win'] = match_data_copy['home_score'] < match_data_copy['away_score']
     match_data_copy['draw'] = match_data_copy['home_score'] == match_data_copy['away_score']
@@ -206,8 +211,6 @@ def create_yearly_team_statistics(df, csv_file_name):
             team_stats['neutral_goals_conceded'])
     team_stats['total_goal_difference'] = (
             team_stats['total_goals_scored'] - team_stats['total_goals_conceded'])
-    team_stats['total_points'] = (
-            team_stats['total_goals_scored'] * 3 + team_stats['total_goal_difference'] * 1)
     team_stats['total_wins'] = (
             team_stats['home_wins'] + team_stats['away_wins'] + team_stats[
         'neutral_wins'])
@@ -217,6 +220,8 @@ def create_yearly_team_statistics(df, csv_file_name):
     team_stats['total_loses'] = (
             team_stats['home_losses'] + team_stats['away_losses'] + team_stats[
         'neutral_losses'])
+    team_stats['total_points'] = (
+            team_stats['total_wins'] * 3 + team_stats['total_draws'] * 1)
     team_stats['total_games_played'] = (
             team_stats['total_wins'] + team_stats['total_draws'] + team_stats[
         'total_loses'])
@@ -226,19 +231,21 @@ def create_yearly_team_statistics(df, csv_file_name):
             team_stats['total_draws'] / team_stats['total_games_played'])
     team_stats['loss_percentage'] = (
             team_stats['total_loses'] / team_stats['total_games_played'])
-
+    team_stats['total_goals_cumulative_sum'] = team_stats.groupby('team')['total_goals_scored'].cumsum()
+    team_stats['total_goals_conceded_cumulative_sum'] = team_stats.groupby('team')['total_goals_conceded'].cumsum()
+    team_stats['total_points_cumulative_sum'] = team_stats.groupby('team')['total_points'].cumsum()
     team_stats.to_csv(csv_file_name)
 
 
 def create_yearly_team_statistics_no_friendly(match_data):
     match_data_copy = match_data.copy()
     match_data_copy = match_data_copy[match_data_copy['tournament'] != 'Friendly']
-    create_yearly_team_statistics(match_data_copy, 'teams_yearly_summary_no_friendly.csv')
+    create_yearly_team_statistics(match_data_copy, 'overall_stats/teams_yearly_summary_no_friendly.csv')
 
 def create_fifa_world_cup_stats(match_data):
     match_data_copy = match_data.copy()
     match_data_copy = match_data_copy[match_data_copy['tournament'] == 'FIFA World Cup']
-    create_yearly_team_statistics(match_data_copy, 'fifa_world_cups_teams_summary.csv')
+    create_yearly_team_statistics(match_data_copy, 'world_cup/fifa_world_cups_teams_summary.csv')
 
 if __name__ == '__main__':
-    create_fifa_world_cup_stats(match_data)
+    print('Creating combined data frame')
