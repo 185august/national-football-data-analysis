@@ -1,60 +1,61 @@
+import base64
+import tempfile
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import matplotlib.animation as animation
+from matplotlib.pyplot import figure
+from pandas.core.config_init import writer_engine_doc
 
 
-
-
-def setup_plot_style(ax):
+def setup_plot_style(ax, x_label, title):
     ax.set_facecolor('white')
     ax.spines['right'].set_visible(False)
     ax.tick_params(axis='both', which='major', labelsize=12)
-    ax.set_xlabel('Total goals scored', fontsize=14)
-    ax.set_title('Top 10 teams by total goals scored', fontsize=16)
+    ax.set_xlabel(x_label, fontsize=14)
+    ax.set_title(title, fontsize=16)
+
 
 def add_year_text(ax, year):
-    ax.text(0.95, 0.1, year, horizontalalignment='right', verticalalignment='bottom', transform=ax.transAxes, fontsize=14)
+    ax.text(0.95, 0.1, year, horizontalalignment='right', verticalalignment='bottom', transform=ax.transAxes,
+            fontsize=14)
     return ax
 
-def create_animation():
-    df = pd.read_csv('team_yearly_stats.csv')
 
-    all_teams = df['team'].unique()
+def goals_total_over_time_for_countries_animation():
+    world_cup_goals_over_time = pd.read_csv('world_cup/cumulative_stats_over_time_world_cup.csv')
+    all_teams = world_cup_goals_over_time['team'].unique()
     cmap_name = 'tab20'
     cmap_obj = plt.colormaps.get_cmap(cmap_name)
     colors = cmap_obj.resampled(len(all_teams))
 
     team_color_map = {team: colors(i) for i, team in enumerate(all_teams)}
 
-    df['total_goals_cumulative_sum'] = df.groupby('team')['total_goals_scored'].cumsum()
-    frames = df['year'].unique()
+    frames = world_cup_goals_over_time['year'].unique()
     fig, ax = plt.subplots(figsize=(12, 6))
+
     def animate(frame):
         ax.clear()
-        year_stats_frame = df[df['year'] == frame]
+        year_stats_frame = world_cup_goals_over_time[world_cup_goals_over_time['year'] == frame]
 
-        top_countries = year_stats_frame.nlargest(10, 'total_goals_cumulative_sum').sort_values('total_goals_cumulative_sum', ascending=True)
+        top_countries = year_stats_frame.nlargest(10, 'goals').sort_values('goals', ascending=True)
 
         bar_colors = [team_color_map[team] for team in top_countries['team']]
 
-        ax.barh(top_countries['team'], top_countries['total_goals_cumulative_sum'], color=bar_colors)
+        ax.barh(top_countries['team'], top_countries['goals'], color=bar_colors)
 
         for i, row in top_countries.iterrows():
-            ax.text(row['total_goals_cumulative_sum'], row['team'], str(int(row["total_goals_cumulative_sum"])), ha='left', va='center')
+            ax.text(row['goals'], row['team'], str(int(row["goals"])), ha='left', va='center')
 
-        setup_plot_style(ax)
+        setup_plot_style(ax, 'Total goals scored', 'Top 10 teams by total goals scored')
         add_year_text(ax, frame)
         plt.tight_layout()
 
-    anim = animation.FuncAnimation(fig, animate, frames=frames, interval=300, repeat=False)
-
+    anim = animation.FuncAnimation(fig, animate, frames=frames, interval=600, repeat=False)
 
     return anim
 
-if __name__ == '__main__':
-    anim = create_animation()
-    plt.show()
 
 def create_animation_of_goals_over_time(match_data):
     fig, ax = plt.subplots(figsize=(20, 5))
