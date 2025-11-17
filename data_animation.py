@@ -1,13 +1,10 @@
 import base64
 import tempfile
-
+import os
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import matplotlib.animation as animation
-from matplotlib.pyplot import figure
-from pandas.core.config_init import writer_engine_doc
-
 
 def setup_plot_style(ax, x_label, title):
     ax.set_facecolor('white')
@@ -87,3 +84,22 @@ def create_animation_of_goals_over_time(match_data):
 
     ani = animation.FuncAnimation(fig, update, frames=len(avg_away_goals) + 1, interval=100, repeat=True, blit=True)
     plt.show()
+
+def send_animation_as_base64():
+    tmp_file = tempfile.TemporaryFile('w', suffix='.gif')
+    anim = goals_total_over_time_for_countries_animation()
+    anim.save(tmp_file, writer='imagemagick', fps=1)
+    with open('world_cup_goals_over_time.gif', 'rb') as f:
+         gif = base64.b64encode(f.read()).decode(
+            'utf-8'
+        )
+    import urllib.parse
+    tmp_file.close()
+    gif = 'data:image/gif;base64,' + urllib.parse.quote(gif)
+    return gif
+
+def get_all_animations():
+    animation_data = send_animation_as_base64()
+    import figure_request
+    figure = figure_request.figure_request('world_cup_goals_over_time', animation_data)
+    return figure
