@@ -22,7 +22,7 @@ def add_year_text(ax, year):
     return ax
 
 
-def goals_total_over_time_for_countries_animation():
+def goals_total_over_time_for_countries_world_cup_animation():
     world_cup_goals_over_time = pd.read_csv('world_cup/cumulative_stats_over_time_world_cup.csv')
     all_teams = world_cup_goals_over_time['team'].unique()
     cmap_name = 'tab20'
@@ -57,7 +57,7 @@ def goals_total_over_time_for_countries_animation():
 
 
 def create_animation_of_goals_over_time(match_data):
-    fig, ax = plt.subplots(figsize=(20, 5))
+    fig, ax = plt.subplots(figsize=(20, 6))
 
     avg_home_goals = match_data.groupby([match_data['date'].dt.year])['away_score'].mean()
     avg_away_goals = match_data.groupby([match_data['date'].dt.year])['home_score'].mean()
@@ -85,10 +85,9 @@ def create_animation_of_goals_over_time(match_data):
         return line1, line2
 
     ani = animation.FuncAnimation(fig, update, frames=len(avg_away_goals) + 1, interval=100, repeat=True, blit=True)
-    plt.show()
+    return ani
 
-def send_animation_as_base64():
-    anim = goals_total_over_time_for_countries_animation()
+def send_animation_as_base64(anim):
     with tempfile.NamedTemporaryFile('w', suffix='.gif', delete=False) as tmp_file:
         anim.save(tmp_file.name, writer='pillow', fps=1)
     with open(tmp_file.name, 'rb') as f:
@@ -101,7 +100,8 @@ def send_animation_as_base64():
     return gif
 
 def get_all_animations():
-    animation_data = send_animation_as_base64()
+    animation = goals_total_over_time_for_countries_world_cup_animation()
+    animation_data = send_animation_as_base64(animation)
     import figure_request
     figure = figure_request.figure_request('world_cup_goals_over_time', animation_data)
     return figure
